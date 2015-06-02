@@ -1,3 +1,9 @@
+pilas (0.84.3-5) unstable; urgency=medium
+
+  * Dependencia por Box2D_23 eliminada para Lihuen 6.
+
+ -- Soporte Lihuen <soportelihuen@linti.unlp.edu.ar>  Tue, 02 Jun 2015 20:00:10 -0300
+
 pilas (0.84.3-4) unstable; urgency=low
 
   * Arreglos de cálculos sobre el ping
