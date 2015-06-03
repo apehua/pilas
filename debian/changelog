@@ -1,3 +1,10 @@
+pilas (0.84.3-6) UNRELEASED; urgency=medium
+
+  * Vuelta a poner la dependencia, la librería compilada existe
+    pero el wrapper para Python de box2d no está actualizado en el repo
+
+ -- Soporte Lihuen <soportelihuen@linti.unlp.edu.ar>  Tue, 02 Jun 2015 22:27:57 -0300
+
 pilas (0.84.3-5) unstable; urgency=medium
 
   * Dependencia por Box2D_23 eliminada para Lihuen 6.
