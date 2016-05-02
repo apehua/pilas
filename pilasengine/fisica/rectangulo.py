@@ -6,7 +6,10 @@
 #
 # Website - http://www.pilas-engine.com.ar
 
-import Box2D as box2d
+try:
+    import Box2D_23 as box2d
+except ImportError:
+    import Box2D as box2d
 
 from pilasengine.fisica.figura import Figura
 from pilasengine import utils

@@ -7,7 +7,10 @@
 # Website - http://www.pilas-engine.com.ar
 
 import math
-import Box2D as box2d
+try:
+    import Box2D_23 as box2d
+except ImportError:
+    import Box2D as box2d
 
 from pilasengine.depurador.modo import ModoDepurador
 from pilasengine import colores

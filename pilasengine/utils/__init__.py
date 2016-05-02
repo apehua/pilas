@@ -224,7 +224,10 @@ def realizar_pruebas():
     print "Box 2D:",
 
     try:
-        import Box2D as box2d
+        try:
+            import Box2D_23 as box2d
+        except ImportError:
+            import Box2D as box2d
 
         ver = box2d.__version_info__
 

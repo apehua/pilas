@@ -6,7 +6,10 @@
 #
 # Website - http://www.pilas-engine.com.ar
 
-import Box2D as box2d
+try:
+    import Box2D_23 as box2d
+except ImportError:
+    import Box2D as box2d
 
 class ObjetosContactListener(box2d.b2ContactListener):
     """Gestiona las colisiones de los objetos para ejecutar funcionés."""
