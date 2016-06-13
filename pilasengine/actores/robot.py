@@ -7,6 +7,7 @@ from PyQt4 import QtGui, uic
 
 from datetime import datetime, timedelta
 
+import pilasengine
 import pilasengine.utils as utils
 from pilasengine.comportamientos import avanzar
 from pilasengine import comportamientos
@@ -95,8 +96,6 @@ def _actorDetrasDelRobot(psX, psY, crX, crY, piX, piY):
         return True
 
 
-def _actor_no_valido(actor):
-    return (not isinstance(actor, Pizarra) and (not isinstance(actor, Fondo)) and  (not isinstance(actor, Ejes))  )
 
 
 def wait(seconds=0):
@@ -412,9 +411,13 @@ class Robot(object):
 
     def _actoresEnLaEscena(self):
         actores = []
-        for actor in self.pilas.escena_actual().actores:
-            if (id(actor) != id(self.actor) and _actor_no_valido(actor)):
-                actores.append(actor)
+        for actor in self.pilas.escena_actual()._actores:
+            if actor is self.actor:
+                continue
+            if (isinstance(actor, pilasengine.actores.Pizarra)
+                    or isinstance(actor, pilasengine.actores.Ejes)):
+                continue
+            actores.append(actor)
         return actores
 
 
