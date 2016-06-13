@@ -574,6 +574,15 @@ class Actores(object):
                                  velocidad_maxima=velocidad_maxima,
                                  angulo_de_movimiento=angulo_de_movimiento)
 
+    def Board(self, device='/dev/ttyUSB0'):
+        ":rtype: robot.Board"
+        return self._crear_actor('robot', 'Board', device=device)
+
+    def Robot(self, board, robotid=0, x=0, y=0):
+        ":rtype: robot.Robot"
+        return self._crear_actor('robot', 'Robot',
+                                 board=board, robotid=robotid, x=x, y=y)
+
     def _crear_actor(self, modulo, clase, *k, **kw):
 
         referencia_a_modulo = importlib.import_module('pilasengine.actores.' + modulo)
@@ -672,6 +681,8 @@ class Actores(object):
         self.vincular_actor_estandar('disparo_laser', 'DisparoLaser')
         self.vincular_actor_estandar('misil', 'Misil')
         self.vincular_actor_estandar('bala', 'Bala')
+        self.vincular_actor_estandar('robot', 'Board')
+        self.vincular_actor_estandar('robot', 'Robot')
 
 
 from pilasengine.actores.aceituna import Aceituna
@@ -736,6 +747,8 @@ from pilasengine.actores.pingu import Pingu
 from pilasengine.actores.pizarra import Pizarra
 from pilasengine.actores.planeta import Planeta
 from pilasengine.actores.puntaje import Puntaje
+from pilasengine.actores.robot import Board
+from pilasengine.actores.robot import Robot
 from pilasengine.actores.shaolin import Shaolin
 from pilasengine.actores.sombra import Sombra
 from pilasengine.actores.sonido import Sonido

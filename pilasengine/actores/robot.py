@@ -1,6 +1,5 @@
 # -*- encoding: utf-8 -*-
 
-import pilas
 import math
 import weakref
 
@@ -8,9 +7,9 @@ from PyQt4 import QtGui, uic
 
 from datetime import datetime, timedelta
 
-from pilas.actores import Pizarra
-import pilas.utils as utils
-from pilas.actores import Ejes
+import pilasengine.utils as utils
+from pilasengine.comportamientos import avanzar
+from pilasengine import comportamientos
 
 # Calculos para sensor Ping
 
@@ -32,23 +31,22 @@ def _puntos_de_la_linea(x1, y1, x2, y2):
         linea["C"] = x1 * (-1)
     else:
         linea["B"] = 1
-        linea["A"] = (-1 * (y1 - y2)) / (x1 - x2)
-        linea["C"] = (-1 * (linea["A"] * x1)) - (linea["B"] * y1)
+        linea["A"] =  (-1 * (y1 - y2)) / (x1 - x2)
+        linea["C"] = (-1 * (linea ["A"] * x1)) - (linea["B"] * y1)
 
     return linea
 
+def _puntoEInterseccionConLaLinea(puntoX, puntoY, pendienteM ):
 
-def _puntoEInterseccionConLaLinea(puntoX, puntoY, pendienteM):
     linea = {}
     linea["A"] = pendienteM * -1
     linea["B"] = 1
-    linea["C"] = ((linea["A"] * puntoX) + (linea["B"] * puntoY)) * -1
+    linea["C"]  = ( (linea["A"] * puntoX)  + (linea["B"] * puntoY) ) * -1
     return linea
 
-
 def _sonParalelas(linea1, linea2):
-    return ((math.fabs(linea1["A"] - linea2["A"]) <= EPSILON ) and
-            (math.fabs(linea1["B"] - linea2["B"]) <= EPSILON ))
+
+    return ((math.fabs(linea1["A"] - linea2["A"]) <= EPSILON ) and (math.fabs(linea1["B"] - linea2["B"]) <= EPSILON ))
 
 def _sonCoincidentes(linea1, linea2):
 
@@ -100,11 +98,12 @@ def _actorDetrasDelRobot(psX, psY, crX, crY, piX, piY):
 def _actor_no_valido(actor):
     return (not isinstance(actor, Pizarra) and (not isinstance(actor, Fondo)) and  (not isinstance(actor, Ejes))  )
 
-def wait(seconds = 0):
+
+def wait(seconds=0):
     """ Produce un retardo de seconds segundos en los que el robot no hace nada. """
 
-    now = datetime.now()
-    while now + timedelta(0, seconds, 0) > datetime.now():
+    end_time = datetime.now() + timedelta(seconds=seconds)
+    while datetime.now() < end_time:
         QtGui.QApplication.processEvents()
 
 
@@ -119,33 +118,65 @@ def _puntosParaLaRecta(x, y, grados, distancia):
 
     return (puntoX, puntoY)
 
-#### Robot
+
+class AvanzarConTiempo(avanzar.Avanzar):
+    def iniciar(self, receptor, robot, velocidad, tiempo=-1):
+        super(AvanzarConTiempo, self).iniciar(receptor, 0, velocidad)
+        self.robot = robot
+        if tiempo >= 0:
+            self.hora_fin = datetime.now() + timedelta(seconds=tiempo)
+        else:
+            self.hora_fin = None
+
+    def actualizar(self):
+        if not self.robot.movimiento:
+            return True
+        if self.hora_fin is None or datetime.now() < self.hora_fin:
+            self.receptor.x += self.dx * self.velocidad
+            self.receptor.y += self.dy * self.velocidad
+        else:
+            return True
+
+
+class GirarConTiempo(comportamientos.Comportamiento):
+    def iniciar(self, receptor, robot, velocidad, tiempo=-1):
+        super(GirarConTiempo, self).iniciar(receptor)
+        self.robot = robot
+        self.velocidad = velocidad
+        if tiempo >= 0:
+            self.hora_fin = datetime.now() + timedelta(seconds=tiempo)
+        else:
+            self.hora_fin = None
+
+    def actualizar(self):
+        if not self.robot.movimiento:
+            return True
+        if self.hora_fin is None or datetime.now() < self.hora_fin:
+            self.receptor.rotacion += self.velocidad
+        else:
+            return True
+
 
 class Robot(object):
-
-
-
-    def __init__(self,board, robotid=0, x=0, y=0):
+    def __init__(self, pilas=None, board=None, robotid=0, x=0, y=0):
         """ Inicializa el robot y lo asocia con la placa board. """
 
-        self.actor = pilas.actores.Tortuga()
-        imagen = pilas.imagenes.cargar('RobotN6.png')
-        self.actor.set_imagen(imagen)
+        self.pilas = pilas
+        self.actor = self.pilas.actores.Tortuga()
+        self.actor.imagen = self.pilas.imagenes.cargar('RobotN6.png')
         self.actor.rotacion = 270
         self.actor.velocidad = 3
         self.actor.pasos = 1
         self.actor.anterior_x = x
         self.actor.anterior_y = y
         self.actor.bajalapiz()
-        self.actor.bajalapiz()
         self.actor.radio_de_colision = 31
         self.actor.color = pilas.colores.negro
 
-
         # Se queda en pantalla
-        self.actor.aprender(pilas.habilidades.SeMantieneEnPantalla)
+        self.actor.aprender(self.pilas.habilidades.SeMantieneEnPantalla)
         # Se puede arrastrar con el mouse
-        self.actor.aprender(pilas.habilidades.Arrastrable)
+        self.actor.aprender(self.pilas.habilidades.Arrastrable)
 
         self.radio_de_colision = self.actor.radio_de_colision
         self.robotid = robotid
@@ -153,18 +184,6 @@ class Robot(object):
         self.name = ''
         self.proxy = weakref.proxy(self)
         self.board.agregarRobot(self.proxy)
-        self.tarea = None
-
-
-    def __getattribute__(self, metodo):
-        atributos = ["forward", "backward", "turnLeft", "turnRight", "beep",
-                        "getObstacle","getLine", "ping", "stop", "battery" , "senses",
-                        "setId", "setName" , "getName", "speak", "bajalapiz" , "subelapiz",
-                        "set_x", "set_y", "get_x", "get_y" ]
-        if metodo in atributos:
-            QtGui.QApplication.processEvents()
-
-        return object.__getattribute__(self, metodo)
 
 
     # Redefinir el método eliminar de la clase Actor para que lo elimine también de la lista de robots de Board
@@ -173,50 +192,27 @@ class Robot(object):
         self.actor.eliminar()
 
     ## Movimiento horizontal y vertical
-
-    def _setVelocidad(self, valor):
-        """ Asigna una velocidad de movimiento real al robot """
-        if ((valor % 2 == 0) and (valor % 10 == 0)):
-            self.actor.velocidad = valor / 10 / 2
-        else:
-            cvalor = valor / 10
-            self.actor.velocidad = (cvalor / 2 ) + 1
-
-    def _velocidadValida(self, vel, exta, extb):
-        return ((vel >= exta) & (vel <= extb))
-
-    def forward(self, vel=50, seconds=-1):
-        """ El robot avanza con velocidad vel durante seconds segundos. """
-        self.stop()
-        self.board._mover(self, vel,  seconds)
-        QtGui.QApplication.processEvents()
-
-
     def _realizarMovimiento(self, vel, seconds):
         """ El robot avanza con velocidad vel durante seconds segundos. """
 
-        def adelanteSinTiempo():
-            self.actor.hacer(pilas.comportamientos.Avanzar(self.actor.velocidad, self.actor.velocidad))
-            return (self.movimiento)
-
-        def atrasSinTiempo():
-            self.actor.hacer(pilas.comportamientos.Retroceder(self.actor.velocidad, self.actor.velocidad))
-            return (self.movimiento)
-
         self.stop()
-        self._setVelocidad(vel)
-
-        if (self._velocidadValida(vel, 10, 100)):
+        if 0 <= abs(vel) <= 100:
             self.movimiento = True
-            self.tarea = pilas.escena_actual().tareas.condicional(0.1, adelanteSinTiempo)
-            if (seconds != -1):
+            self.actor.hacer(AvanzarConTiempo, self, vel / 40.0, seconds)
+            if seconds >= 0:
                 wait(seconds)
                 self.stop()
-        elif (self._velocidadValida(vel, -100, -10)):
+        else:
+            print   """ Rangos de velocidades válidas:
+                                -100 a -10
+                                  10 a 100   """
+
+    def _realizarGiro(self, vel, seconds):
+        self.stop()
+        if 0 <= abs(vel) <= 100:
             self.movimiento = True
-            self.tarea = pilas.escena_actual().tareas.condicional(0.1, atrasSinTiempo)
-            self.actor.velocidad = self.actor.velocidad * -1
-            if (seconds != -1):
+            self.actor.hacer(GirarConTiempo, self, vel / 40.0, seconds)
+            if seconds >= 0:
                 wait(seconds)
                 self.stop()
         else:
@@ -225,65 +221,49 @@ class Robot(object):
                                   10 a 100   """
 
 
+    def forward(self, vel=50, seconds=-1):
+        """ El robot avanza con velocidad vel durante seconds segundos. """
+        self.board._mover(self, vel,  seconds)
+
     def backward(self, vel=50, seconds=-1):
         """ El robot retrocede con velocidad vel durante seconds segundos.  """
-        self.stop()
         self.board._mover(self, -vel, seconds)
 
     ## Movimiento de giro
     def turnRight(self, vel=50, seconds=-1):
         """ El robot gira a la derecha con velocidad vel durante seconds segundos. """
-        self.stop()
-        self.board._girar(self, vel, seconds)
-
-    def _realizarGiro(self, vel, seconds):
-
-        def izquierdaSinTiempo():
-            self.actor.hacer(pilas.comportamientos.Girar(-abs(self.actor.velocidad), self.actor.velocidad))
-            return (self.movimiento)
-
-        def derechaSinTiempo():
-            self.actor.hacer(pilas.comportamientos.Girar(abs(self.actor.velocidad), self.actor.velocidad))
-            return (self.movimiento)
-
-        self.stop()
-        self._setVelocidad(vel)
-
-
-        if (self._velocidadValida(vel, 10, 100)):
-            self.movimiento = True
-            self.tarea = pilas.escena_actual().tareas.condicional(0.1, derechaSinTiempo)
-            if (seconds != -1):
-                wait(seconds)
-                self.stop()
-        elif (self._velocidadValida(vel, -100, -10)):
-            self.movimiento = True
-            self.tarea = pilas.escena_actual().tareas.condicional(0.1, izquierdaSinTiempo)
-            self.actor.velocidad = self.actor.velocidad * -1
-            if (seconds != -1):
-                wait(seconds)
-                self.stop()
-        else:
-            print   """ Rangos de velocidades válidas:
-                                -100 a -10
-                                  10 a 100   """
-
+        self.board._girar(self, -vel, seconds)
 
     def turnLeft(self, vel=50, seconds=-1):
         """ El robot gira a la izquierda con velocidad vel durante seconds segundos. """
-        self.stop()
-        self.board._girar(self, -vel, seconds)
-
+        self.board._girar(self, vel, seconds)
 
     def beep(self, freq=200, seconds=0):
         """ Hace que el robot emita un pitido con frecuencia freq durante seconds segundos."""
         utils.beep(freq, seconds)
 
     def _detenerse(self):
+        def es_movimiento(instance):
+            if instance is None:
+                return False
+            return (isinstance(instance.objeto, AvanzarConTiempo) or
+                    isinstance(instance.objeto, GirarConTiempo))
+
+        # Esta variable en False haría que el comportamiento termine
         self.movimiento = False
-        if not (self.tarea is None):
-            self.tarea.terminar()
-        self.tarea = None
+
+        # Pero si se ejecuta un movimiento después del otro esto
+        # no es suficiente porque self.movimiento vuelve a cambiar
+        # a True y el comportamiento puede no detectar esto.
+        # Para forzarlo se eliminan los comportamientos de movimiento
+        # (se itera sobre una copia de la lista para evitar problemas al
+        # borrar)
+        for c in self.actor.comportamientos[:]:
+            if es_movimiento(c):
+                self.actor.comportamientos.remove(c)
+
+        if es_movimiento(self.actor.comportamiento_actual):
+            self.actor._adoptar_el_siguiente_comportamiento()
 
     def stop(self):
         self.board._detener(self)
@@ -362,16 +342,14 @@ class Robot(object):
     def getLine(self):
         """ Devuelve los valores de los sensores de linea. """
 
-        escena = pilas.escena_actual()
-        ancho = escena.fondo.ancho()
-        alto = escena.fondo.alto()
+        ancho, alto = self.pilas.escena_actual().get_fondo().dimension_fondo()
 
         xb, yb = _puntosParaLaRecta(self.actor.x, self.actor.y, self.actor.rotacion, 31)
 
         vi = 0
         ximagen = ancho / 2 + xb
         yimagen = alto / 2 - yb
-        valores = pilas.mundo.gestor_escenas.escena_actual().get_fondo().informacion_de_un_pixel(ximagen, yimagen)
+        valores = self.pilas.mundo.gestor_escenas.escena_actual().get_fondo().informacion_de_un_pixel(ximagen, yimagen)
         for i in valores:
             vi = vi + i
 
@@ -434,15 +412,16 @@ class Robot(object):
 
     def _actoresEnLaEscena(self):
         actores = []
-        for actor in pilas.escena_actual().actores:
+        for actor in self.pilas.escena_actual().actores:
             if (id(actor) != id(self.actor) and _actor_no_valido(actor)):
                 actores.append(actor)
         return actores
 
 
 class Board(object):
-    def __init__(self, device='/dev/ttyUSB0'):
+    def __init__(self, pilas=None, device='/dev/ttyUSB0'):
         """Inicializa el dispositivo de conexion con el/los robot/s  """
+        self.pilas = pilas
         self.device = device
         self.listaDeRobots = []
 
@@ -472,13 +451,13 @@ class Board(object):
             print i.getId()
 
     def _mover(self, unRobot, vel, seconds):
-        """ Envía un movimiento  vertical/horizontal a toos los robots con el mismo ID  """
+        """ Envía un movimiento  vertical/horizontal a todos los robots con el mismo ID  """
         for i in self.listaDeRobots:
             if (i.getId() == unRobot.getId()):
                 i._realizarMovimiento(vel, seconds)
 
     def _girar(self, unRobot, vel, seconds):
-        """ Envía un movimiento a izquierda/derecha a toos los robots con el mismo ID  """
+        """ Envía un movimiento a izquierda/derecha a todos los robots con el mismo ID  """
         for i in self.listaDeRobots:
             if (i.getId() == unRobot.getId()):
                 i._realizarGiro(vel, seconds)
@@ -518,8 +497,8 @@ class Sense(QtGui.QMainWindow):
             self.ui.dline.display('%0.2f' % der)
             return self.activo
 
-        pilas.escena_actual().tareas.condicional(3, mostrarBateria)
-        pilas.escena_actual().tareas.condicional(1, mostrarPing)
-        pilas.escena_actual().tareas.condicional(1, mostrarSensoresDeLinea)
+        self.pilas.escena_actual().tareas.condicional(3, mostrarBateria)
+        self.pilas.escena_actual().tareas.condicional(1, mostrarPing)
+        self.pilas.escena_actual().tareas.condicional(1, mostrarSensoresDeLinea)
 
 
